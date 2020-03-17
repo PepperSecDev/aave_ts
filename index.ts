@@ -1,11 +1,9 @@
 require("dotenv").config();
-import fetch from "node-fetch";
-import { Response } from "node-fetch";
+import fetch, { Response } from "node-fetch";
 import Web3 from "web3";
 const httpProvider = new Web3.providers.HttpProvider(
   <string>process.env.RPC_URL
 );
-// import * as Web3 from "web3";
 import { numberToHex, toHex, toWei, toBN, fromWei } from "web3-utils";
 const AAVE_LIQUIDATIONS =
   "https://protocol-api.aave.com/data/users/liquidations";
@@ -55,7 +53,6 @@ async function healthFactorFromContract(user: string): Promise<number> {
 
 async function main() {
   const cdps: CDP[] = await getCDPs();
-  console.log(cdps);
   let previousUser = null;
   for (let { principalBorrows, reserve, user } of cdps) {
     if (Number(user.totalBorrowsUSD) > 10 && Number(user.healthFactor) > 0.5) {
