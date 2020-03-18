@@ -1,14 +1,14 @@
 require("dotenv").config();
 import fetch, { Response } from "node-fetch";
 import Web3 from "web3";
+import { numberToHex, toHex, toWei, toBN, fromWei } from "web3-utils";
+
+const AAVE_LIQUIDATIONS = "https://protocol-api.aave.com/data/users/liquidations";
+const ORACLE_ABI = require("./abi.json");
+
 const httpProvider = new Web3.providers.HttpProvider(
   <string>process.env.RPC_URL
 );
-import { numberToHex, toHex, toWei, toBN, fromWei } from "web3-utils";
-const AAVE_LIQUIDATIONS =
-  "https://protocol-api.aave.com/data/users/liquidations";
-const ORACLE_ABI = require("./abi.json");
-// { transactionConfirmationBlocks: 1 }
 const web3 = new Web3(httpProvider);
 const lendingPool = new web3.eth.Contract(
   ORACLE_ABI,
@@ -16,32 +16,44 @@ const lendingPool = new web3.eth.Contract(
 );
 
 interface CDP {
-  principalBorrows: object;
+  principalBorrows: any;
   reserve: {
-    symbol: any;
+    symbol: string;
   };
   user: {
-    totalBorrowsUSD: any;
-    healthFactor: any;
+    totalBorrowsUSD: number;
+    healthFactor: number;
     id: any;
     reservesData: any;
   };
 }
 
-interface HttpResponse<T> extends Response {
+interface HttpResponse extends Response {
   parsedBody?: any;
 }
 
-async function getCDPs<T>(): Promise<CDP[]> {
-  let result: HttpResponse<T> = await fetch(AAVE_LIQUIDATIONS, {
+// async function getCDPs(): Promise<CDP[]> {
+//   let result: Response = await fetch(AAVE_LIQUIDATIONS, {
+//     method: "GET",
+//     headers: {
+//       "Content-Type": "application/json",
+//       Accept: "application/json"
+//     }
+//   });
+//   const jsonData = await result.json();
+//   return jsonData.data;
+// }
+
+async function getCDPs(): Promise<CDP[]> {
+  const result = await fetch(AAVE_LIQUIDATIONS, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json"
     }
   });
-  result.parsedBody = await result.json();
-  return result.parsedBody.data;
+  const jsonData = await result.json();
+  return jsonData.data;
 }
 
 async function healthFactorFromContract(user: string): Promise<number> {
@@ -55,7 +67,8 @@ async function main() {
   const cdps: CDP[] = await getCDPs();
   let previousUser = null;
   for (let { principalBorrows, reserve, user } of cdps) {
-    if (Number(user.totalBorrowsUSD) > 10 && Number(user.healthFactor) > 0.5) {
+    console.log('user.totalBorrowsUSD', typeof user.totalBorrowsUSD)
+    if (user.totalBorrowsUSD > 10 && user.healthFactor > 0.5) {
       const HF: number = await healthFactorFromContract(user.id);
       if (HF >= 1) continue; // outdated data
       if (previousUser === null) {
