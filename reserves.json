@@ -1,0 +1,42 @@
+{
+    "TUSD": {
+        "address": "0x0000000000085d4780b73119b644ae5ecd22b376",
+        "decimals": 18
+    },
+    "DAI": {
+        "address": "0x6b175474e89094c44da98b954eedeac495271d0f",
+        "decimals": 18
+    },
+    "USDC": {
+        "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "decimals": 6
+    },
+    "LINK": {
+        "address": "0x514910771af9ca656af840dff83e8264ecf986ca",
+        "decimals": 18
+    },
+    "ETH": {
+        "address": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "decimals": 18
+    },
+    "USDT": {
+        "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+        "decimals": 6
+    },
+    "sUSD": {
+        "address": "0x57Ab1ec28D129707052df4dF418D58a2D46d5f51",
+        "decimals": 18
+    },
+    "WBTC": {
+        "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
+        "decimals": 8
+    },
+    "BAT": {
+        "address": "0x0d8775f648430679a709e98d2b0cb6250d2887ef",
+        "decimals": 18
+    },
+    "MKR": {
+        "address": "0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2",
+        "decimals": 18
+    }
+}
