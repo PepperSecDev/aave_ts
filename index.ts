@@ -64,7 +64,7 @@ async function liquidate(cdp: CDP) :Promise<void> {
       // console.log(
       //   `    ${principalATokenBalance} ${reserve.symbol} ($${currentUnderlyingBalanceUSD})`
       // );
-      largestCollateral = { 
+      largestCollateral = {
         principalATokenBalance,
         reserve,
         currentUnderlyingBalanceUSD
@@ -106,7 +106,7 @@ async function main() {
       previousUser = user.id;
 
       console.log(
-        `There is a CDP of ${principalBorrows} ${reserve.symbol} ($${user.totalBorrowsUSD})`
+        `There is a CDP of ${principalBorrows} ${reserve.symbol} ${reserve.id} ($${user.totalBorrowsUSD})`
       );
       console.log("Colaterals are:");
       for (let {
@@ -116,7 +116,7 @@ async function main() {
       } of user.reservesData) {
         if (Number(principalATokenBalance) > 0) {
           console.log(
-            `    ${principalATokenBalance} ${reserve.symbol} ($${currentUnderlyingBalanceUSD})`
+            `    ${principalATokenBalance} ${reserve.symbol} ${reserve.id} ($${currentUnderlyingBalanceUSD})`
           );
         }
       }

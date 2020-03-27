@@ -1,6 +1,7 @@
 require("dotenv").config();
 import fetch from "node-fetch";
 import Web3 from "web3";
+import { hexToAscii, toHex } from "web3-utils"
 
 const AAVE_SUBGRAPH = "https://api.thegraph.com/subgraphs/name/aave/protocol-raw";
 
@@ -55,7 +56,7 @@ async function main() {
   process.exit(0)
 }
 
-main()
+// main()
 
 
 // async function checkOne() {
@@ -74,4 +75,27 @@ main()
 //   }
 // }
 
-// checkOne()
+async function checkOneAave() {
+  const user = '0x28030a0c1ab5Da0FadaF886246C46Cf4e86F9345'
+  const reserve = '0x80fB784B7eD66730e8b1DBd9820aFD29931aab03'
+  const collateral = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'
+  let profit, data, gas
+  try {
+    // function liquidate(
+    //   address user,
+    //   address reserve,
+    //   address collateral
+    profit = await flashLiquidator.methods.liquidate(user, reserve, collateral).call( { gas: '7000000'})
+    // gas = await flashLiquidator.methods.liquidate(user).estimateGas()
+    // data = await flashLiquidator.methods.liquidate(user).encodeABI()
+    // console.log('data', data)
+    console.log(`user ${user}`)
+    console.log('profit', toHex(profit))
+    console.log('profit', hexToAscii(toHex(profit)))
+  } catch (e) {
+    console.error(e)
+    console.log(`user ${user} failed`)
+  }
+}
+
+checkOneAave()
