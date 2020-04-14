@@ -28,25 +28,34 @@ export class ReservesData {
 export class User {
     @Transform(value => new BigNumber(value), { toClassOnly: true })
     totalBorrowsUSD: BigNumber;
-  
+
     @Type(() => Number)
     healthFactor: number;
-  
+
     @Transform(value => toChecksumAddress(value), { toClassOnly: true })
     id: string;
 
     @Type(() => ReservesData)
     reservesData: ReservesData[];
   }
-  
+
 export class CDP {
     @Transform(value => new BigNumber(value), { toClassOnly: true })
     principalBorrows: BigNumber;
-  
+
     @Type(() => User)
     user: User;
-  
+
     @Type(() => Reserve)
     reserve: Reserve;
   }
+
+export class OneSplitReturn {
+  @Transform(value => new BigNumber(value), { toClassOnly: true })
+  returnAmount: BigNumber;
+
+  // @Transform((values: BigNumber[]) => values.map(value => new BigNumber(value)), { toClassOnly: true })
+  @Type(() => String)
+  distribution: string[];
+}
 

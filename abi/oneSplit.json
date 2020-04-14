@@ -1,0 +1,88 @@
+[
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"internalType": "contract IERC20",
+				"name": "fromToken",
+				"type": "address"
+			},
+			{
+				"internalType": "contract IERC20",
+				"name": "toToken",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "parts",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "featureFlags",
+				"type": "uint256"
+			}
+		],
+		"name": "getExpectedReturn",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "returnAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "distribution",
+				"type": "uint256[]"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"internalType": "contract IERC20",
+				"name": "fromToken",
+				"type": "address"
+			},
+			{
+				"internalType": "contract IERC20",
+				"name": "toToken",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "minReturn",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "distribution",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "uint256",
+				"name": "featureFlags",
+				"type": "uint256"
+			}
+		],
+		"name": "swap",
+		"outputs": [],
+		"payable": true,
+		"stateMutability": "payable",
+		"type": "function"
+	}
+]
