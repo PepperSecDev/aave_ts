@@ -87,7 +87,7 @@ async function getExpectedReturn(fromToken: string, toToken: string, amount: Big
         resolve(result);
       } catch (e) {
         console.log("RPC failed. RetryAttempt is", retryAttempt, e.message);
-        if (retryAttempt > 1) {
+        if (retryAttempt > 20) {
           reject(e);
         } else {
           call(retryAttempt);
@@ -278,7 +278,7 @@ async function main() {
       }
     }
   }
-  process.exit(0)
+  setTimeout(main, 60000)
 }
 
 main();

@@ -1,7 +1,7 @@
 version: "3.7"
 
 services:
-  hunterbot:
+  aavebot:
     build: "."
     restart: always
     env_file: .env
