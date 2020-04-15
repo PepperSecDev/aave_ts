@@ -5,9 +5,11 @@ import "reflect-metadata";
 import { plainToClass } from "class-transformer";
 import Web3 from "web3";
 import { fromWei, toChecksumAddress, numberToHex, toHex, toWei, hexToAscii } from "web3-utils";
-import { CDP, ReservesData, Reserve, OneSplitReturn } from "./schemas"
+import { CDP, ReservesData, Reserve, OneSplitReturn, User } from "./schemas"
 import GasPriceFetcher from "./gasPriceFetcher"
 import BigNumber from "bignumber.js";
+const CoinGecko = require("coingecko-api");
+const CoinGeckoClient = new CoinGecko();
 
 const AAVE_LIQUIDATIONS = "https://protocol-api.aave.com/data/users/liquidations";
 
@@ -45,9 +47,28 @@ const TOKENS: Record<string, number> = {
   [DAI]: 1,
   [USDC]: 2,
   [SAI]: 3,
-};
-function addressToMarketId(address: string): number | undefined {
+}
+
+function addressToMarketId(address: string): number {
   return TOKENS[toChecksumAddress(address)];
+}
+
+function marketIdToAddress(id: number) {
+  for (let [ token, marketId ] of Object.entries(TOKENS)) {
+    if (marketId === id) {
+      return token
+    }
+  }
+  return
+}
+
+async function getPriceInUSD(tokenAddress: string) {
+  const arpa = await CoinGeckoClient.simple.fetchTokenPrice({
+    contract_addresses: tokenAddress,
+    vs_currencies: "usd",
+    assetPlatform: "ethereum",
+  });
+  return arpa.data[tokenAddress.toLowerCase()].usd;
 }
 
 async function getCDPs(): Promise<CDP[]> {
@@ -107,9 +128,10 @@ async function prepareArgs(reserve: Reserve, borrowing: BigNumber, collateral: R
   borrowing = borrowing.multipliedBy(new BigNumber(10).pow(reserve.decimals))
   const collateralAmount = collateral.principalATokenBalance.multipliedBy(new BigNumber(10).pow(collateral.reserve.decimals))
 
-  let distributionTo: string[] = [];
-  let distributionFrom: string[] = [];
-  let flashTokenId;
+  let beforeLiquidationSplit: string[] = [];
+  let afterLiquidationSplit: string[] = [];
+  let remaningReserveSplit: string[] = [];
+  let flashTokenId: number;
   const reserveMarketId = addressToMarketId(reserve.id);
   const collateralMarketId = addressToMarketId(collateral.reserve.id);
   let flashTokenAmount;
@@ -122,35 +144,44 @@ async function prepareArgs(reserve: Reserve, borrowing: BigNumber, collateral: R
       reserve.id,
       collateralAmount // TODO
     );
-    distributionFrom = distribution;
+    afterLiquidationSplit = distribution;
   } else if (collateralMarketId) {
     console.log("we can get flash loan in collateral token");
     flashTokenId = collateralMarketId;
     flashTokenAmount = collateralAmount;
-    const { distribution } = await getExpectedReturn(
+    let { distribution } = await getExpectedReturn(
       collateral.reserve.id,
       reserve.id,
       collateralAmount // TODO we probably should exchange a half or so
     );
-    distributionTo = distribution;
+    beforeLiquidationSplit = distribution;
+
+    ({ distribution } = await getExpectedReturn(
+      reserve.id,
+      collateral.reserve.id,
+      borrowing
+    ));
+    remaningReserveSplit = distribution;
   } else {
     console.log("lets take flash loan in WETH then");
     flashTokenId = addressToMarketId(WETH);
     // a rough calculation of how much WETH we need
-    let { returnAmount } = await getExpectedReturn(
+    let { returnAmount, distribution } = await getExpectedReturn(
       reserve.id,
       WETH,
       borrowing
     );
     flashTokenAmount = add5Percent(returnAmount);
+    // since we borrow more than we need, there will be so reserve leftovers, so we need to exchange them back
+    remaningReserveSplit = distribution;
 
     // the distribution of the WETH to "reserve" swap
-    let { distribution } = await getExpectedReturn(
+    ({ distribution } = await getExpectedReturn(
       WETH,
       reserve.id,
       flashTokenAmount
-    );
-    distributionTo = distribution;
+    ));
+    beforeLiquidationSplit = distribution;
 
     // the distribution of the "collateral" to WETH swap
     ({ distribution } = await getExpectedReturn(
@@ -158,14 +189,15 @@ async function prepareArgs(reserve: Reserve, borrowing: BigNumber, collateral: R
       WETH,
       collateralAmount // TODO we probably should exchange a half or so
     ));
-    distributionFrom = distribution;
+    afterLiquidationSplit = distribution;
   }
 
   return {
     flashTokenId,
     flashTokenAmount,
-    distributionTo,
-    distributionFrom,
+    beforeLiquidationSplit,
+    afterLiquidationSplit,
+    remaningReserveSplit
   };
 }
 
@@ -198,83 +230,131 @@ async function liquidateTx(cdp: CDP) :Promise<any> {
   const {
     flashTokenId,
     flashTokenAmount,
-    distributionTo,
-    distributionFrom
+    beforeLiquidationSplit,
+    afterLiquidationSplit,
+    remaningReserveSplit
   } = await prepareArgs(reserve, cdp.principalBorrows, largestCollateral)
-  // console.log('distributionTo', distributionTo)
-  // console.log('distributionFrom', distributionFrom)
+  // console.log('beforeLiquidationSplit', beforeLiquidationSplit)
+  // console.log('afterLiquidationSplit', afterLiquidationSplit)
+  // console.log('afterLiquidationSplit', remaningReserveSplit)
   const data = await flashLiquidator.methods.liquidate(
     flashTokenId,
     flashTokenAmount,
     user.id,
     reserve.id,
     largestCollateral.reserve.id,
-    distributionTo,
-    distributionFrom
+    beforeLiquidationSplit,
+    afterLiquidationSplit,
+    remaningReserveSplit
   ).encodeABI()
 
   let nonce = await web3.eth.getTransactionCount(account.address);
   const tx = {
     from: web3.eth.defaultAccount,
     value: "0x00",
-    gas: numberToHex(2000000),
-    gasPrice: toHex(toWei(fetcher.gasPrices.fast.toString(), "gwei")),
+    gas: numberToHex(3500000),
+    gasPrice: toHex(toWei(fetcher.gasPrices.standard.toString(), "gwei")),
     to: LIQUIDATOR_ADDRESS,
     netId: 1,
     data,
     nonce,
   };
 
-  return tx
+  return { tx, flashToken: marketIdToAddress(flashTokenId) }
 }
+
+function printCDP(previousUser: string, principalBorrows: BigNumber, reserve: Reserve, user: User, HF: number) {
+  if (previousUser !== user.id) {
+    console.log("\n=================NEXT USER CDPs===============\n");
+  } else {
+    console.log("");
+  }
+  previousUser = user.id;
+
+  console.log(
+    `There is a CDP of ${principalBorrows} ${reserve.symbol} ${reserve.id} ($${user.totalBorrowsUSD})`
+  );
+  console.log("Colaterals are:");
+  for (let {
+    principalATokenBalance,
+    reserve,
+    currentUnderlyingBalanceUSD
+  } of user.reservesData) {
+    if (Number(principalATokenBalance) > 0) {
+      console.log(
+        `    ${principalATokenBalance} ${reserve.symbol} ${reserve.id} ($${currentUnderlyingBalanceUSD})`
+      );
+    }
+  }
+  console.log(`The healthFactor is ${user.healthFactor} (${HF})`);
+  console.log(`User address is ${user.id}`);
+}
+
+
 
 async function main() {
   const cdps: CDP[] = await getCDPs();
   // console.log('cdps', cdps[0])
   let previousUser = null;
   for (let { principalBorrows, reserve, user } of cdps) {
-    if (user.totalBorrowsUSD.gt(1) && user.healthFactor > 0) {
+    if (user.totalBorrowsUSD.gt(5) && user.healthFactor > 0) {
       const HF: number = await healthFactorFromContract(user.id);
       if (HF >= 1) continue; // outdated data
       if (previousUser === null) {
         previousUser = user.id;
       }
-      if (previousUser !== user.id) {
-        console.log("\n=================NEXT USER CDPs===============\n");
-      } else {
-        console.log("");
-      }
-      previousUser = user.id;
-
-      console.log(
-        `There is a CDP of ${principalBorrows} ${reserve.symbol} ${reserve.id} ($${user.totalBorrowsUSD})`
-      );
-      console.log("Colaterals are:");
-      for (let {
-        principalATokenBalance,
-        reserve,
-        currentUnderlyingBalanceUSD
-      } of user.reservesData) {
-        if (Number(principalATokenBalance) > 0) {
-          console.log(
-            `    ${principalATokenBalance} ${reserve.symbol} ${reserve.id} ($${currentUnderlyingBalanceUSD})`
-          );
-        }
-      }
-      console.log(`The healthFactor is ${user.healthFactor} (${HF})`);
-      console.log(`User address is ${user.id}`);
-      const tx = await liquidateTx({ principalBorrows, reserve, user })
+      printCDP(previousUser, principalBorrows, reserve, user, HF)
+      const { tx, flashToken } = await liquidateTx({ principalBorrows, reserve, user })
       try {
-        const gas = await web3.eth.estimateGas(tx);
-        console.log("Gas required:", gas);
-        let realProfit = await web3.eth.call(tx);
-        console.log('realProfit', realProfit.toString())
+        const gas = new BigNumber(await web3.eth.estimateGas(tx));
+        console.log("Gas required:", gas.toString());
+        const realProfitHex = (await web3.eth.call(tx)).toString();
+        let realProfit = Number(fromWei(
+          realProfitHex,
+          flashToken === USDC ? "picoether" : "ether" // usdc has 6 decimal
+        ));
+        const price = await getPriceInUSD(flashToken);
+        realProfit = Number(price) * Number(realProfit);
+        if (realProfit === Infinity) {
+          throw new Error('eth_call failed');
+        }
+        console.log(`Real profit ${realProfit}`)
+
+        const ethPrice = await getPriceInUSD(WETH);
+        const expenceInWei = new BigNumber(toWei(fetcher.gasPrices.standard.toString(), "gwei"))
+          .multipliedBy(gas)
+          .toString();
+        const expense =
+          Number(fromWei(expenceInWei)) *
+          ethPrice;
+        console.log(`Tx cost $${expense}`);
+
+        if (realProfit > expense + 0.2) {
+          let signedTx = await web3.eth.accounts.signTransaction(
+            tx,
+            PRIVATE_KEY
+          );
+          let result = web3.eth.sendSignedTransaction(
+            signedTx.rawTransaction!
+          );
+          result
+            .once("transactionHash", function (txHash) {
+              console.log(
+                `Success: A new successfully sent tx https://etherscan.io/tx/${txHash}`
+              );
+            })
+            .on("error", async function (e) {
+              console.log("error", e.message);
+            });
+        }
       } catch (e) {
         console.error("Error: skipping tx ", e.message);
         const message = await web3.eth.call(tx);
         console.log("Error: Revert reason is", hexToAscii(toHex(message.toString())));
       } finally {
-        console.log('The tx is\n', tx)
+        tx.nonce = undefined
+        tx.netId = undefined
+        console.log('The tx is\n', JSON.stringify(tx))
       }
     }
   }
