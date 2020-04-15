@@ -116,23 +116,23 @@ async function prepareArgs(reserve: Reserve, borrowing: BigNumber, collateral: R
   if (reserveMarketId !== undefined) {
     console.log("we can get flash loan in reserve token");
     flashTokenId = reserveMarketId;
+    flashTokenAmount = borrowing; // TODO probably we should take a half
     const { distribution } = await getExpectedReturn(
       collateral.reserve.id,
       reserve.id,
       collateralAmount // TODO
     );
     distributionFrom = distribution;
-    flashTokenAmount = borrowing; // TODO probably we should take a half
   } else if (collateralMarketId) {
     console.log("we can get flash loan in collateral token");
     flashTokenId = collateralMarketId;
-    const { returnAmount, distribution } = await getExpectedReturn(
+    flashTokenAmount = collateralAmount;
+    const { distribution } = await getExpectedReturn(
       collateral.reserve.id,
       reserve.id,
       collateralAmount // TODO we probably should exchange a half or so
     );
     distributionTo = distribution;
-    flashTokenAmount = returnAmount;
   } else {
     console.log("lets take flash loan in WETH then");
     flashTokenId = addressToMarketId(WETH);
