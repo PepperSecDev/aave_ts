@@ -73,20 +73,25 @@ async function getPriceInUSD(tokenAddress: string) {
 
 async function getCDPs(): Promise<CDP[]> {
   let cdps: CDP[] = []
-  const result = await fetch(AAVE_LIQUIDATIONS, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json"
+  try {
+    const result = await fetch(AAVE_LIQUIDATIONS, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      }
+    });
+    const jsonData = await result.json();
+
+    for(let cdp of jsonData.data) {
+      cdps.push(plainToClass(CDP, cdp))
     }
-  });
-  const jsonData = await result.json();
 
-  for(let cdp of jsonData.data) {
-    cdps.push(plainToClass(CDP, cdp))
+    return cdps
+  } catch(e) {
+    console.log(e.message)
+    return cdps
   }
-
-  return cdps
 }
 
 async function healthFactorFromContract(user: string): Promise<number> {
@@ -318,7 +323,7 @@ async function main() {
         if (realProfit === Infinity) {
           throw new Error('eth_call failed');
         }
-        console.log(`Real profit ${realProfit}`)
+        console.log(`Real profit $${realProfit}`)
 
         const ethPrice = await getPriceInUSD(WETH);
         const expenceInWei = new BigNumber(toWei(fetcher.gasPrices.standard.toString(), "gwei"))
@@ -327,9 +332,9 @@ async function main() {
         const expense =
           Number(fromWei(expenceInWei)) *
           ethPrice;
-        console.log(`Tx cost $${expense}`);
+        console.log(`Tx cost $${expense} Gas price ${fetcher.gasPrices.standard} Gwei`);
 
-        if (realProfit > expense + 0.2) {
+        if (realProfit > expense + 1) {
           let signedTx = await web3.eth.accounts.signTransaction(
             tx,
             PRIVATE_KEY
