@@ -44,7 +44,7 @@ export default class Fetcher {
           this.gasPrices.low = parseInt(json.percentile_30)
         }
 
-        console.log('gas price fetch', this.gasPrices)
+        // console.log('gas price fetch', this.gasPrices)
       } else {
         throw Error('Fetch gasPrice failed')
       }

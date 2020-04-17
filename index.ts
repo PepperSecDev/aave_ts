@@ -294,7 +294,7 @@ function printCDP(previousUser: string, principalBorrows: BigNumber, reserve: Re
 
 async function main() {
   const cdps: CDP[] = await getCDPs();
-  // console.log('cdps', cdps[0])
+  console.log(`Start processing new ${cdps.length} CDPs`)
   let previousUser = null;
   for (let { principalBorrows, reserve, user } of cdps) {
     if (user.totalBorrowsUSD.gt(5) && user.healthFactor > 0) {
@@ -358,6 +358,7 @@ async function main() {
       }
     }
   }
+  console.log("Finished processing the whole aave market. Lets wait 60 sec and start again.")
   setTimeout(main, 60000)
 }
 
