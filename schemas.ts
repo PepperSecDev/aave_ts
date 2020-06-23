@@ -10,8 +10,11 @@ export class Reserve {
   @Type(() => BigNumber)
   decimals: BigNumber
 
-  @Transform(value => toChecksumAddress(value), { toClassOnly: true })
+  @Type(() => String)
   id: string;
+
+  @Transform(value => toChecksumAddress(value), { toClassOnly: true })
+  underlyingAsset: string;
 }
 
 export class ReservesData {

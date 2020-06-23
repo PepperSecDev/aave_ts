@@ -19,6 +19,7 @@ const { PRIVATE_KEY, GAS_PRICE, RPC_WSS_URL, LIQUIDATOR_ADDRESS } = process.env
 const httpProvider = new Web3.providers.WebsocketProvider(RPC_WSS_URL);
 const web3 = new Web3(httpProvider);
 const account = web3.eth.accounts.privateKeyToAccount('0x' + PRIVATE_KEY)
+console.log('account.address', account.address)
 web3.eth.accounts.wallet.add('0x' + PRIVATE_KEY)
 web3.eth.defaultAccount = account.address
 
@@ -44,9 +45,9 @@ const SAI = "0x89d24A6b4CcB1B6fAA2625fE562bDD9a23260359";
 const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 const TOKENS: Record<string, number> = {
   [WETH]: 0,
-  [DAI]: 1,
+  [SAI]: 1,
   [USDC]: 2,
-  [SAI]: 3,
+  [DAI]: 3,
 }
 
 function addressToMarketId(address: string): number {
@@ -137,16 +138,16 @@ async function prepareArgs(reserve: Reserve, borrowing: BigNumber, collateral: R
   let afterLiquidationSplit: string[] = [];
   let remaningReserveSplit: string[] = [];
   let flashTokenId: number;
-  const reserveMarketId = addressToMarketId(reserve.id);
-  const collateralMarketId = addressToMarketId(collateral.reserve.id);
+  const reserveMarketId = addressToMarketId(reserve.underlyingAsset);
+  const collateralMarketId = addressToMarketId(collateral.reserve.underlyingAsset);
   let flashTokenAmount;
   if (reserveMarketId !== undefined) {
     console.log("we can get flash loan in reserve token");
     flashTokenId = reserveMarketId;
     flashTokenAmount = borrowing; // TODO probably we should take a half
     const { distribution } = await getExpectedReturn(
-      collateral.reserve.id,
-      reserve.id,
+      collateral.reserve.underlyingAsset,
+      reserve.underlyingAsset,
       collateralAmount // TODO
     );
     afterLiquidationSplit = distribution;
@@ -155,15 +156,15 @@ async function prepareArgs(reserve: Reserve, borrowing: BigNumber, collateral: R
     flashTokenId = collateralMarketId;
     flashTokenAmount = collateralAmount;
     let { distribution } = await getExpectedReturn(
-      collateral.reserve.id,
-      reserve.id,
+      collateral.reserve.underlyingAsset,
+      reserve.underlyingAsset,
       collateralAmount // TODO we probably should exchange a half or so
     );
     beforeLiquidationSplit = distribution;
 
     ({ distribution } = await getExpectedReturn(
-      reserve.id,
-      collateral.reserve.id,
+      reserve.underlyingAsset,
+      collateral.reserve.underlyingAsset,
       borrowing
     ));
     remaningReserveSplit = distribution;
@@ -172,7 +173,7 @@ async function prepareArgs(reserve: Reserve, borrowing: BigNumber, collateral: R
     flashTokenId = addressToMarketId(WETH);
     // a rough calculation of how much WETH we need
     let { returnAmount, distribution } = await getExpectedReturn(
-      reserve.id,
+      reserve.underlyingAsset,
       WETH,
       borrowing
     );
@@ -183,14 +184,14 @@ async function prepareArgs(reserve: Reserve, borrowing: BigNumber, collateral: R
     // the distribution of the WETH to "reserve" swap
     ({ distribution } = await getExpectedReturn(
       WETH,
-      reserve.id,
+      reserve.underlyingAsset,
       flashTokenAmount
     ));
     beforeLiquidationSplit = distribution;
 
     // the distribution of the "collateral" to WETH swap
     ({ distribution } = await getExpectedReturn(
-      collateral.reserve.id,
+      collateral.reserve.underlyingAsset,
       WETH,
       collateralAmount // TODO we probably should exchange a half or so
     ));
@@ -246,8 +247,8 @@ async function liquidateTx(cdp: CDP) :Promise<any> {
     flashTokenId,
     flashTokenAmount,
     user.id,
-    reserve.id,
-    largestCollateral.reserve.id,
+    reserve.underlyingAsset,
+    largestCollateral.reserve.underlyingAsset,
     beforeLiquidationSplit,
     afterLiquidationSplit,
     remaningReserveSplit
@@ -277,7 +278,7 @@ function printCDP(previousUser: string, principalBorrows: BigNumber, reserve: Re
   previousUser = user.id;
 
   console.log(
-    `There is a CDP of ${principalBorrows} ${reserve.symbol} ${reserve.id} ($${user.totalBorrowsUSD})`
+    `There is a CDP of ${principalBorrows} ${reserve.symbol} ${reserve.underlyingAsset} ($${user.totalBorrowsUSD})`
   );
   console.log("Colaterals are:");
   for (let {
@@ -287,7 +288,7 @@ function printCDP(previousUser: string, principalBorrows: BigNumber, reserve: Re
   } of user.reservesData) {
     if (Number(principalATokenBalance) > 0) {
       console.log(
-        `    ${principalATokenBalance} ${reserve.symbol} ${reserve.id} ($${currentUnderlyingBalanceUSD})`
+        `    ${principalATokenBalance} ${reserve.symbol} ${reserve.underlyingAsset} ($${currentUnderlyingBalanceUSD})`
       );
     }
   }
