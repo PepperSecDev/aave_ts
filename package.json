@@ -12,7 +12,7 @@
     "@types/node": "^13.9.1",
     "@types/node-fetch": "^2.5.5",
     "bignumber.js": "^9.0.0",
-    "class-transformer": "^0.2.3",
+    "class-transformer": "^0.3.1",
     "coingecko-api": "^1.0.10",
     "dotenv": "^8.2.0",
     "node-fetch": "^2.6.0",
